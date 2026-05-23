@@ -84,10 +84,6 @@ export const renderLanding = (container, actions) => {
   };
 
   const validateAndRun = (fn) => {
-    // Play background music on first interaction via YouTube API
-    if (window.startBackgroundMusic) {
-      window.startBackgroundMusic();
-    }
 
     if (!selectedTeam) {
       teamRequired.style.display = 'inline';
