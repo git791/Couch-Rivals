@@ -42,6 +42,30 @@ export const handler = async (event) => {
         },
         ActionAfterCompletion: "DELETE",
       }));
+
+      if (matchEvent.type === "DANGEROUS_ATTACK") {
+        const resolveDelay = delaySeconds + 15;
+        const resolveFireAt = new Date(now.getTime() + resolveDelay * 1000);
+        const resolveScheduleTime = resolveFireAt.toISOString().split(".")[0];
+        await scheduler.send(new CreateScheduleCommand({
+          Name: `match-${roomId}-momentum-${matchEvent.time}`,
+          ScheduleExpression: `at(${resolveScheduleTime})`,
+          FlexibleTimeWindow: { Mode: "OFF" },
+          Target: {
+            Arn: process.env.PROCESS_EVENT_FUNCTION_ARN,
+            RoleArn: process.env.SCHEDULER_ROLE_ARN,
+            Input: JSON.stringify({
+              roomId,
+              event: {
+                type: "MOMENTUM_RESOLVE",
+                time: matchEvent.time + 15 * speed,
+                team: "none"
+              }
+            }),
+          },
+          ActionAfterCompletion: "DELETE",
+        }));
+      }
     } catch (e) {
       console.error("Scheduler error:", e);
     }

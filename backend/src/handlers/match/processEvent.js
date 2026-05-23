@@ -1,9 +1,83 @@
 import { broadcastToRoom } from "../../lib/broadcast.js";
-import { getItem, putItem, deleteItem } from "../../lib/dynamodb.js";
+import { getItem, putItem, deleteItem, queryItems } from "../../lib/dynamodb.js";
 import { resolvePrediction } from "./resolvePrediction.js";
+
+const EVENT_POINTS = {
+  "GOAL": 100,
+  "YELLOW_CARD": -20,
+  "RED_CARD": -50,
+  "SHOT_ON_TARGET": 10,
+  "SAVE": 15
+};
 
 export const handler = async (event) => {
   const { roomId, event: matchEvent } = event;
+
+  // Handle Momentum Resolve Event (Early Return)
+  if (matchEvent.type === "MOMENTUM_RESOLVE") {
+    const room = await getItem({ PK: `ROOM#${roomId}`, SK: "METADATA" });
+    if (room) {
+      const homeTaps = room.homeTaps || 0;
+      const awayTaps = room.awayTaps || 0;
+      let winner = "tie";
+      if (homeTaps > awayTaps) {
+        winner = "home";
+      } else if (awayTaps > homeTaps) {
+        winner = "away";
+      }
+
+      await broadcastToRoom(roomId, {
+        type: "MOMENTUM_RESULT",
+        data: { winner, homeTaps, awayTaps }
+      });
+
+      if (winner !== "tie") {
+        const allScores = await queryItems({
+          KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+          ExpressionAttributeValues: {
+            ":pk": `ROOM#${roomId}`,
+            ":prefix": "SCORE#"
+          }
+        });
+
+        if (allScores && allScores.length > 0) {
+          for (const score of allScores) {
+            if (score.team === winner) {
+              const newPoints = (score.points || 0) + 150;
+              score.points = newPoints;
+              score.GSI1SK = `SCORE#${String(newPoints).padStart(6, "0")}`;
+              await putItem(score);
+            }
+          }
+
+          const freshScores = await queryItems({
+            KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+            ExpressionAttributeValues: {
+              ":pk": `ROOM#${roomId}`,
+              ":prefix": "SCORE#"
+            }
+          });
+
+          const leaderboard = freshScores
+            .map(s => ({
+              userId: s.userId,
+              displayName: s.displayName,
+              team: s.team,
+              points: s.points || 0,
+              streak: s.streak || 0,
+              predictions: s.predictions || 0
+            }))
+            .sort((a, b) => b.points - a.points);
+
+          await broadcastToRoom(roomId, {
+            type: "LEADERBOARD_UPDATE",
+            data: { scores: leaderboard }
+          });
+        }
+      }
+    }
+    return { statusCode: 200, body: "Momentum resolved" };
+  }
 
   // 1. Broadcast the match event to the room
   await broadcastToRoom(roomId, {
@@ -21,6 +95,63 @@ export const handler = async (event) => {
         player: matchEvent.player,
       },
     });
+  }
+
+  // Apply team-specific match event points
+  const pointsDelta = EVENT_POINTS[matchEvent.type];
+  if (pointsDelta && (matchEvent.team === "home" || matchEvent.team === "away")) {
+    const allScores = await queryItems({
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+      ExpressionAttributeValues: {
+        ":pk": `ROOM#${roomId}`,
+        ":prefix": "SCORE#"
+      }
+    });
+
+    if (allScores && allScores.length > 0) {
+      for (const score of allScores) {
+        if (score.team === matchEvent.team) {
+          const newPoints = Math.max(0, (score.points || 0) + pointsDelta);
+          score.points = newPoints;
+          score.GSI1SK = `SCORE#${String(newPoints).padStart(6, "0")}`;
+          await putItem(score);
+        }
+      }
+
+      const freshScores = await queryItems({
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        ExpressionAttributeValues: {
+          ":pk": `ROOM#${roomId}`,
+          ":prefix": "SCORE#"
+        }
+      });
+
+      const leaderboard = freshScores
+        .map(s => ({
+          userId: s.userId,
+          displayName: s.displayName,
+          team: s.team,
+          points: s.points || 0,
+          streak: s.streak || 0,
+          predictions: s.predictions || 0
+        }))
+        .sort((a, b) => b.points - a.points);
+
+      await broadcastToRoom(roomId, {
+        type: "LEADERBOARD_UPDATE",
+        data: { scores: leaderboard }
+      });
+    }
+  }
+
+  // Reset room taps for DANGEROUS_ATTACK (start of momentum war)
+  if (matchEvent.type === "DANGEROUS_ATTACK") {
+    const room = await getItem({ PK: `ROOM#${roomId}`, SK: "METADATA" });
+    if (room) {
+      room.homeTaps = 0;
+      room.awayTaps = 0;
+      await putItem(room);
+    }
   }
 
   // 3. Handle Active Prediction Resolution

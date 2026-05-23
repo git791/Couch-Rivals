@@ -6,7 +6,8 @@ export const handler = async (event) => {
   const body = JSON.parse(event.body || "{}");
   const { roomId, predictionId, answer } = body;
 
-  const userId = `user_${connectionId.substring(0, 8)}`;
+  const conn = await getItem({ PK: `ROOM#${roomId}`, SK: `CONN#${connectionId}` });
+  const userId = conn ? conn.userId : `user_${connectionId.substring(0, 8)}`;
 
   // Ideally, validate prediction expiration time. For now, just record the vote.
   await putItem({

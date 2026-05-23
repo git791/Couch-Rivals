@@ -36,6 +36,7 @@ export const renderMomentumOverlay = (container, actions) => {
       taps = 0;
     }
   }, 1000);
+  window.momentumTapInterval = tapInterval;
 
   // Timer
   let timeLeft = 15;
@@ -47,40 +48,17 @@ export const renderMomentumOverlay = (container, actions) => {
       clearInterval(timerInterval);
       clearInterval(tapInterval);
       
-      // Give local fake outcome for the hackathon
-      const state = window.getState ? window.getState() : {};
-      let outcomeMsg = "MOMENTUM WAR TIED!";
-      let outcomeColor = "#fff";
-      
-      const homeWidth = document.getElementById('momentum-bar-home').style.width;
-      const hPercent = parseFloat(homeWidth);
-      if (hPercent > 55) { outcomeMsg = "BAYERN WINS MOMENTUM!"; outcomeColor = "var(--accent-red)"; }
-      else if (hPercent < 45) { outcomeMsg = "DORTMUND WINS MOMENTUM!"; outcomeColor = "var(--accent-yellow)"; }
-
-      // Give points to local user if their team won!
-      if ((hPercent > 55 && state.team === 'home') || (hPercent < 45 && state.team === 'away')) {
-        if (window.simulateLocalEvent) {
-           // We can just simulate a LEADERBOARD_UPDATE or PREDICTION_RESULT to quickly add points
-           window.simulateLocalEvent('PREDICTION_RESULT', {
-              predictionId: 'momentum_' + Date.now(),
-              correctAnswer: 'Your team won!',
-              results: [{
-                userId: state.userId,
-                pointsEarned: 150,
-                correct: true
-              }]
-           });
-        }
+      // Disable tap button and show calculation state
+      btn.disabled = true;
+      btn.style.opacity = '0.5';
+      btn.innerText = 'LOCKED';
+      if (timerEl) {
+        timerEl.innerText = "Calculating outcome...";
+        timerEl.style.color = "var(--accent-gold)";
       }
-
-      overlayDiv.innerHTML = `
-        <h2 style="font-family:'Bebas Neue'; font-size:4rem; color:${outcomeColor}; text-shadow:0 0 20px ${outcomeColor}; text-align:center;">${outcomeMsg}</h2>
-        <p style="color:#fff; font-family:'Rajdhani'; font-size:1.5rem; text-align:center; margin-top:1rem;">Fan energy boosted!</p>
-      `;
-
-      setTimeout(() => overlayDiv.remove(), 2500);
     }
   }, 1000);
+  window.momentumTimerInterval = timerInterval;
 };
 
 export const updateMomentumBar = (homeTaps, awayTaps) => {

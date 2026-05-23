@@ -198,13 +198,35 @@ const handleMessage = (message) => {
 
         // Brief result message
         if (area) {
+          const myResult = results ? results.find(r => r.userId === state.userId) : null;
+          let icon = "📢";
+          let title = `Result: ${correctAnswer}`;
+          let color = "var(--accent-cyan)";
+          let subtext = "Scores updated!";
+
+          if (myResult) {
+            if (myResult.correct) {
+              icon = "✅";
+              title = "CORRECT!";
+              color = "var(--success)";
+              subtext = `You earned +${myResult.pointsEarned || 50} points!`;
+            } else {
+              icon = "❌";
+              title = "INCORRECT!";
+              color = "var(--danger)";
+              subtext = `The correct answer was: ${correctAnswer}`;
+            }
+          } else {
+            title = `Correct Answer: ${correctAnswer}`;
+          }
+
           area.innerHTML = `
-            <div class="glass-card" style="text-align:center; padding:2rem;">
-              <div style="font-size:2rem; margin-bottom:0.5rem;">✅</div>
-              <h3 style="color:var(--success); font-family:'Bebas Neue'; font-size:1.8rem;">Correct: ${correctAnswer}</h3>
-              <p style="color:#a0aec0; margin-top:0.5rem;">Scores updated!</p>
+            <div class="glass-card" style="text-align:center; padding:2rem; border: 2px solid ${color};">
+              <div style="font-size:2.5rem; margin-bottom:0.5rem;">${icon}</div>
+              <h3 style="color:${color}; font-family:'Bebas Neue'; font-size:2.2rem; letter-spacing:1px;">${title}</h3>
+              <p style="color:#fff; font-family:'Rajdhani'; font-weight:600; font-size:1.1rem; margin-top:0.5rem;">${subtext}</p>
             </div>`;
-          setTimeout(() => { if (area) area.innerHTML = ''; }, 3000);
+          setTimeout(() => { if (area) area.innerHTML = ''; }, 4000);
         }
       }
       break;
@@ -222,6 +244,33 @@ const handleMessage = (message) => {
     case 'MOMENTUM_UPDATE':
       if (state.currentView === 'match') {
         updateMomentumBar(message.data.homeTaps, message.data.awayTaps);
+      }
+      break;
+
+    case 'MOMENTUM_RESULT':
+      if (state.currentView === 'match') {
+        const overlay = document.getElementById('momentum-overlay');
+        if (overlay) {
+          if (window.momentumTimerInterval) clearInterval(window.momentumTimerInterval);
+          if (window.momentumTapInterval) clearInterval(window.momentumTapInterval);
+
+          const { winner, homeTaps, awayTaps } = message.data;
+          let outcomeMsg = "MOMENTUM WAR TIED!";
+          let outcomeColor = "#fff";
+          if (winner === 'home') {
+            outcomeMsg = "BAYERN WINS MOMENTUM!";
+            outcomeColor = "var(--accent-red)";
+          } else if (winner === 'away') {
+            outcomeMsg = "DORTMUND WINS MOMENTUM!";
+            outcomeColor = "var(--accent-yellow)";
+          }
+
+          overlay.innerHTML = `
+            <h2 style="font-family:'Bebas Neue'; font-size:4rem; color:${outcomeColor}; text-shadow:0 0 20px ${outcomeColor}; text-align:center;">${outcomeMsg}</h2>
+            <p style="color:#fff; font-family:'Rajdhani'; font-size:1.5rem; text-align:center; margin-top:1rem;">Fan energy boosted!</p>
+          `;
+          setTimeout(() => overlay.remove(), 2500);
+        }
       }
       break;
 
