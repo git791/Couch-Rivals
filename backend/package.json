@@ -1,0 +1,16 @@
+{
+  "name": "couch-rivals-backend",
+  "version": "1.0.0",
+  "description": "Backend for Couch Rivals real-time multiplayer fan experience",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.500.0",
+    "@aws-sdk/client-dynamodb": "^3.500.0",
+    "@aws-sdk/client-scheduler": "^3.500.0",
+    "@aws-sdk/lib-dynamodb": "^3.500.0"
+  }
+}
