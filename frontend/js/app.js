@@ -101,6 +101,7 @@ const handleMessage = (message) => {
         state.currentView = 'match';
         renderMatch(appContainer, state, actions);
         attachTrashTalk();
+        window.startBackgroundMusic();
       }
       break;
     }
@@ -128,6 +129,7 @@ const handleMessage = (message) => {
       state.currentView = 'match';
       renderMatch(appContainer, state, actions);
       attachTrashTalk();
+      window.startBackgroundMusic();
       break;
 
     case 'MATCH_EVENT':
@@ -344,17 +346,30 @@ window.startBackgroundMusic = () => {
     bgMusic.volume = 0.3;
   }
   if (!isMusicPlaying) {
-    bgMusic.play().catch(e => console.log('Audio play failed:', e));
-    isMusicPlaying = true;
-    document.getElementById('track-name').textContent = "FIFA World Cup";
+    bgMusic.play()
+      .then(() => {
+        isMusicPlaying = true;
+        document.getElementById('track-name').textContent = "FIFA World Cup";
+      })
+      .catch(e => {
+        console.log('Audio autoplay blocked; setting up trigger on next interaction.', e);
+        const playOnInteraction = () => {
+          if (!isMusicPlaying) {
+            bgMusic.play()
+              .then(() => {
+                isMusicPlaying = true;
+                document.getElementById('track-name').textContent = "FIFA World Cup";
+              })
+              .catch(err => console.log('Delayed play failed:', err));
+          }
+          document.body.removeEventListener('click', playOnInteraction);
+          document.body.removeEventListener('keydown', playOnInteraction);
+        };
+        document.body.addEventListener('click', playOnInteraction);
+        document.body.addEventListener('keydown', playOnInteraction);
+      });
   }
 };
-
-document.body.addEventListener('click', () => {
-  if (state.currentView === 'match' && !isMusicPlaying) {
-    window.startBackgroundMusic();
-  }
-}, { once: true });
 
 // Toggle mute/play on the music UI click
 const musicUi = document.getElementById('music-player');
